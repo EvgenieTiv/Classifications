@@ -7,6 +7,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler, OneHotEncoder
 from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.model_selection import GridSearchCV
 
 # pip install pandas numpy matplotlib scikit-learn
 
@@ -22,17 +23,21 @@ from sklearn.tree import DecisionTreeClassifier, plot_tree
 # Лист содержит только один класс, или
 # Достигнута максимальная глубина дерева / минимальное количество объектов в листе (ограничения для переобучения).
 
-current_dir = os.path.dirname(__file__)  # Папка, где находится .py файл
-file_path_read_train = os.path.join(current_dir, "synthetic_200_multiclass.csv")
-file_path_read_to_predict = os.path.join(current_dir, "to_predict_multiclass.csv")
-file_path_write = os.path.join(current_dir, "to_predict_multiclass_with_y.csv")
+сurrent_dir = os.path.dirname(__file__)  # Папка, где находится .py файл
+# file_path_read_train = os.path.join(сurrent_dir, "synthetic_200_rows_with_logic_filled.csv")
+# file_path_read_to_predict = os.path.join(сurrent_dir, "to_predict_filled.csv")
+# file_path_write = os.path.join(сurrent_dir, "to_predict_with_y.csv")
+
+file_path_read_train = os.path.join(сurrent_dir, "winequality_red_train.csv")
+file_path_read_to_predict = os.path.join(сurrent_dir, "winequality_red_to_predict.csv")
+file_path_write = os.path.join(сurrent_dir, "winequality_red_to_predict_with_y.csv")
 
 # 📥 Загрузим тренировочные данные
 df = pd.read_csv(file_path_read_train)
 
 # 📌 Разделим на X (признаки) и y (целевой признак)
-X = df.drop(columns=["y"])
-y = df["y"]
+X = df.drop(columns=["quality"])
+y = df["quality"]
 
 # 🎯 Проверим, какие классы есть
 print("📊 Уникальные классы в y:", y.unique())
@@ -51,8 +56,10 @@ print("📊 Размер обучающей выборки:", X_train.shape)
 print("📊 Размер тестовой выборки:", X_test.shape)
 
 # 1. Определим типы признаков
-numeric_features = ["Height", "Weight", "Age", "Score"]  # укажи свои числовые
-categorical_features = ["Group"]  # укажи свои категориальные
+categorical_features = []
+numeric_features = ["fixed acidity", "volatile acidity", "citric acid", "residual sugar",
+            "chlorides", "free sulfur dioxide", "total sulfur dioxide" , "density",
+            "pH", "sulphates", "alcohol"]
 
 # 2. Построим препроцессор
 preprocessor = ColumnTransformer(transformers=[
@@ -70,7 +77,7 @@ best_accuracy = 0
 best_model = None
 
 for depth in range(1, 11):
-    model = DecisionTreeClassifier(max_depth=depth, random_state=4)
+    model = DecisionTreeClassifier(max_depth=depth, min_samples_leaf=5, random_state=4)
     model.fit(X_train_prepared, y_train)
     y_pred = model.predict(X_test_prepared)
     acc = accuracy_score(y_test, y_pred)
@@ -87,7 +94,12 @@ print(f"\n✅ Лучшая глубина дерева: {best_depth} с accuracy
 
 # 📊 Получаем имена признаков после препроцессора
 feature_names_num = preprocessor.named_transformers_["num"].get_feature_names_out(numeric_features)
-feature_names_cat = preprocessor.named_transformers_["cat"].get_feature_names_out(categorical_features)
+
+if categorical_features:
+    feature_names_cat = preprocessor.named_transformers_["cat"].get_feature_names_out(categorical_features)
+else:
+    feature_names_cat = []
+
 all_feature_names = list(feature_names_num) + list(feature_names_cat)
 
 importances = best_model.feature_importances_
@@ -112,10 +124,10 @@ print(classification_report(y_test, y_pred))
 df_to_predict = pd.read_csv(file_path_read_to_predict)
 
 # 🎯 Сохраняем правильные ответы
-y_true = df_to_predict["y_True"]
+y_true = df_to_predict["quality_True"]
 
 # 🧹 Берем только признаки (без y)
-X_to_predict = df_to_predict.drop(columns=["y", "y_True"])
+X_to_predict = df_to_predict.drop(columns=["quality_True"])
 
 # ♻️ Преобразуем признаки (тем же препроцессором!)
 X_to_predict_prepared = preprocessor.transform(X_to_predict)
@@ -131,7 +143,7 @@ print("\n🧾 Отчет по классам:")
 print(classification_report(y_true, y_pred))
 
 # 📝 Сохраняем предсказания в файл
-df_to_predict["y_pred"] = y_pred
+df_to_predict["quality"] = y_pred
 df_to_predict.to_csv(file_path_write, index=False)
 print(f"\n💾 Результаты сохранены в файл: {file_path_write}")
 
@@ -139,7 +151,7 @@ print(f"\n💾 Результаты сохранены в файл: {file_path_w
 plt.figure(figsize=(20, 10))
 plot_tree(best_model,
           feature_names=preprocessor.get_feature_names_out(),
-          class_names=best_model.classes_,
+          class_names=[str(c) for c in best_model.classes_],
           filled=True,
           rounded=True,
           fontsize=10)
@@ -181,7 +193,7 @@ plt.tight_layout()
 # Чем бледнее, тем смешаннее классы в узле.
 
 # 💾 Сохраняем в файл
-output_path = os.path.join(current_dir, "decision_tree_decision_tree.png")
+output_path = os.path.join(сurrent_dir, "decision_tree_decision_tree.png")
 plt.savefig(output_path, dpi=300)
 
 plt.show()
